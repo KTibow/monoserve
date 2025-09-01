@@ -63,7 +63,7 @@ runs:
       if: env.changes_detected == 'true'
       shell: bash
       working-directory: monoserver-temp
-      run: flyctl deploy
+      run: flyctl deploy --ha=false
       env:
         FLY_API_TOKEN: ${{ steps.auth.outputs.fly_token }}
 
