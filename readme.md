@@ -6,13 +6,17 @@ When I go to school:
 - There are a few serverless sites, but they all either have bad latency or are blocked.
 - There are a number of container/VM hosters, but they usually restrict you to one container.
 
-When you have as many projects as me, none of these solutions work on their own. Monoserve lets you run all your backends on one efficient "monoserver" so you can host your frontend wherever you want. This version is built for Vitelike projects and Fly deployment, but you could fork it and make it work differently.
+When you have as many projects as me, none of these solutions work on their own. Monoserve lets you run all your backends on one efficient "monoserver" so you can host your frontend wherever you want. This version is built for Vite projects and Fly deployment, but you could fork it and make it work differently.
 
-## Action: Bundle
+## Bundle
 
-TODO
+We have a package. It essentially:
+- Provides `fn([schema], function)` for your remote functions
+- Stubs `.remote.{js,ts}` files
+- When developing, TODO
+- When building, wraps and bundles the functions for the monoserver
 
-## Action: Deploy
+## Deploy
 
 ### Prep: Config Broker
 

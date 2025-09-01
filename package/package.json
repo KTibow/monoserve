@@ -1,0 +1,44 @@
+{
+  "name": "monoserve",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://github.com/KTibow/monoserve/tree/main/package#readme",
+  "bugs": {
+    "url": "https://github.com/KTibow/monoserve/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KTibow/monoserve.git"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./plugin": "./dist/plugin.js",
+    "./fn": "./dist/fn.js",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "rolldown": "1.0.0-beta.34"
+  },
+  "devDependencies": {
+    "@standard-schema/spec": "^1.0.0",
+    "@types/node": "^22.15.17",
+    "devalue": "^5.3.2",
+    "tsdown": "^0.11.9",
+    "typescript": "^5.8.3",
+    "vite": "^7.1.3"
+  },
+  "peerDependencies": {
+    "devalue": "^5.3.2"
+  }
+}
