@@ -19,10 +19,37 @@ Deno.serve({ port: PORT }, async (request) => {
   const url = new URL(request.url);
   const modulePromise = functionPromises.get(url.pathname);
 
+  // CORS
+  const origin = request.headers.get("origin") || "";
+  let headers: HeadersInit = {};
+  if (/http:\/\/localhost:\d+/.test(origin)) {
+    headers = {
+      "Access-Control-Allow-Origin": origin,
+      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    };
+    // Handle preflight
+    if (request.method == "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers,
+      });
+    }
+  }
+
   if (!modulePromise) {
-    return new Response("Function not found", { status: 404 });
+    return new Response("Function not found", {
+      status: 404,
+      headers,
+    });
   }
 
   const { default: run } = await modulePromise;
-  return await run(request);
+  const response = await run(request);
+
+  // Attach CORS headers
+  for (const [key, value] of Object.entries(headers)) {
+    response.headers.set(key, value);
+  }
+
+  return response;
 });

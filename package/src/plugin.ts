@@ -48,6 +48,7 @@ const bundle = async (js: string) =>
 const createServer = (path: string) =>
   bundle(
     `
+import { parse, stringify } from "devalue";
 import fn from "${path}";
 export default async (req) => {
   if (req.method != "POST") {
@@ -74,11 +75,11 @@ export default ({ monoserverURL }: Options): Plugin => {
     configResolved(config) {
       isBuild = config.command == "build";
     },
-    async transform(_code, id) {
+    async transform(code, id) {
       const isRemote = id.endsWith(".remote.ts") || id.endsWith(".remote.js");
       if (!isRemote) return;
 
-      const hash = await getHash(id);
+      const hash = await getHash(code);
       remoteModules.set(hash, id);
 
       // Return stub
