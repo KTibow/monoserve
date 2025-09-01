@@ -13,6 +13,9 @@ jobs:
         uses: pnpm/action-setup@v4
         with:
           version: latest
+      - name: Set up package
+        run: pnpm install && pnpm build
+        working-directory: package
       - name: Install
         run: pnpm install
         working-directory: demo
