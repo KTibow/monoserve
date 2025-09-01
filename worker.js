@@ -1,12 +1,12 @@
 export default {
   async fetch(request, env) {
-    if (request.method != "POST") {
-      return new Response("Method not allowed", { status: 405 });
+    const url = new URL(request.url);
+    if (url.pathname != "/") {
+      return new Response("Not found", { status: 404 });
     }
 
-    const url = new URL(request.url);
-    if (url.pathname != "/auth") {
-      return new Response("Not found", { status: 404 });
+    if (request.method != "POST") {
+      return new Response("Method not allowed", { status: 405 });
     }
 
     const body = await request.json();
