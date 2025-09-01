@@ -1,5 +1,5 @@
-name: "Monoserve Deploy"
-description: "Syncs Monoserve functions onto Fly"
+name: Monoserver
+description: Syncs functions onto a Monoserver
 inputs:
   config-broker-url:
     description: "Config broker (probably Cloudflare Worker)"
@@ -12,9 +12,10 @@ runs:
       shell: bash
       id: auth
       run: |
-        response=$(curl -s -X POST "${{ inputs.config-broker-url }}/auth" \
+        response=$(curl -s -X POST "${{ inputs.config-broker-url }}" \
           -H "Content-Type: application/json" \
-          -d '{"github_token": "${{ github.token }}"}')
+          -d '{"github_token": "${{ github.token }}"}' \
+          --fail-with-body)
 
         echo "fly_token=$(echo $response | jq -r .fly_token)" >> $GITHUB_OUTPUT
         echo "github_token=$(echo $response | jq -r .github_token)" >> $GITHUB_OUTPUT
