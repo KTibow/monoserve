@@ -4,6 +4,10 @@ inputs:
   config-broker-url:
     description: "Config broker (probably Cloudflare Worker)"
     required: true
+  workdir:
+    description: "Path to use as working directory"
+    required: false
+    default: "."
 
 runs:
   using: "composite"
@@ -30,12 +34,18 @@ runs:
       shell: bash
       working-directory: monoserver-temp
       run: |
-        repo_name=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+        # Find source and destination
+        src_dir="${GITHUB_WORKSPACE}/${{ inputs.workdir }}/functions"
 
-        # Add functions
+        repo_name=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+        if [ -n "${{ inputs.workdir }}" ] && [ "${{ inputs.workdir }}" != "." ]; then
+          repo_name="${repo_name}_$(basename "${{ inputs.workdir }}")"
+        fi
+
+        # Add functions to monoserver under a folder named for this repo/workdir
         rm -rf "functions/${repo_name}"
         mkdir -p functions
-        cp -r ../functions "functions/${repo_name}"
+        cp -r "$src_dir" "functions/${repo_name}"
 
         # Check if there are any changes using git
         git add functions/
@@ -52,7 +62,7 @@ runs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "Monoserver Sync"
-        git commit -m "Sync functions from ${{ github.repository }}"
+        git commit -m "Sync functions from ${{ github.repository }} - ${{ inputs.workdir }}"
         git push
 
     - name: Setup Fly CLI
