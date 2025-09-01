@@ -1,0 +1,71 @@
+name: "Monoserve Deploy"
+description: "Syncs monoserver functions from repo and deploys to Fly"
+inputs:
+  config-broker-url:
+    description: "Config broker (probably Cloudflare Worker)"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Use config broker
+      shell: bash
+      id: auth
+      run: |
+        response=$(curl -s -X POST "${{ inputs.config-broker-url }}/auth" \
+          -H "Content-Type: application/json" \
+          -d '{"github_token": "${{ github.token }}"}')
+
+        echo "fly_token=$(echo $response | jq -r .fly_token)" >> $GITHUB_OUTPUT
+        echo "github_token=$(echo $response | jq -r .github_token)" >> $GITHUB_OUTPUT
+        echo "github_repo=$(echo $response | jq -r .github_repo)" >> $GITHUB_OUTPUT
+
+    - name: Clone monoserver functions repo
+      shell: bash
+      run: |
+        git clone https://x-access-token:${{ steps.auth.outputs.github_token }}@github.com/${{ steps.auth.outputs.github_repo }}.git monoserver-temp
+
+    - name: Sync functions and check for changes
+      shell: bash
+      working-directory: monoserver-temp
+      run: |
+        repo_name=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+
+        # Add functions
+        rm -rf "functions/${repo_name}"
+        mkdir -p functions
+        cp -r ../functions "functions/${repo_name}"
+
+        # Check if there are any changes using git
+        git add functions/
+        if git diff --cached --quiet; then
+          echo "changes_detected=false" >> $GITHUB_ENV
+        else
+          echo "changes_detected=true" >> $GITHUB_ENV
+        fi
+
+    - name: Commit and push changes to monoserver
+      if: env.changes_detected == 'true'
+      shell: bash
+      working-directory: monoserver-temp
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "Monoserver Sync"
+        git commit -m "Sync functions from ${{ github.repository }}"
+        git push
+
+    - name: Setup Fly CLI
+      if: env.changes_detected == 'true'
+      uses: superfly/flyctl-actions/setup-flyctl@master
+
+    - name: Deploy to Fly
+      if: env.changes_detected == 'true'
+      shell: bash
+      working-directory: monoserver-temp
+      run: flyctl deploy
+      env:
+        FLY_API_TOKEN: ${{ steps.auth.outputs.fly_token }}
+
+    - name: Cleanup
+      shell: bash
+      run: rm -rf monoserver-temp
