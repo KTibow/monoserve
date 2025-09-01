@@ -13,7 +13,7 @@ When you have as many projects as me, none of these solutions work on their own.
 We have a package. It essentially:
 - Provides `fn([schema], function)` for your remote functions
 - Stubs `.remote.{js,ts}` files
-- When developing, TODO
+- When developing, hosts the functions locally
 - When building, wraps and bundles the functions for the monoserver
 
 ## Deploy
@@ -26,7 +26,7 @@ You can write your own as long as it accepts a `github_token` and, if it's for t
 
 ### Prep: Monoserver
 
-You also should create the monoserver ahead of time. This means (in most cases) making a folder, setting up Fly within that folder, setting up Git within that folder, setting up a server (see [Dockerfile](https://github.com/KTibow/monoserve/blob/main/example-Dockerfile), [deno.json](https://github.com/KTibow/monoserve/blob/main/example-deno.json), and [server.ts](https://github.com/KTibow/monoserve/blob/main/example-server.ts)) within that folder, and sending it to GitHub. Don't forget to tell your config broker about the monoserver repo.
+You also should create the monoserver ahead of time. This means (in most cases) making a folder, setting up Fly within that folder, setting up Git within that folder, setting up a server (see [Dockerfile](https://github.com/KTibow/monoserve/blob/main/example-Dockerfile), [deno.json](https://github.com/KTibow/monoserve/blob/main/example-deno.json), and [server.ts](https://github.com/KTibow/monoserve/blob/main/example-server.ts)) within that folder, and sending it to GitHub. Don't forget to configure your config broker and modify the server to allow for CORS.
 
 ### Usage
 
