@@ -10,11 +10,31 @@ When you have as many projects as me, none of these solutions work on their own.
 
 ## Bundle
 
-We have a package. It essentially:
-- Provides `fn([schema], function)` for your remote functions
-- Stubs `.remote.{js,ts}` files
-- When developing, hosts the functions locally
-- When building, wraps and bundles the functions for the monoserver
+### Prep
+
+Install both of `monoserve devalue` with your favorite package manager.
+
+Update your `vite.config.js` to `import monoserve from "monoserve/plugin"`, and make sure your `plugins` has something like `monoserve({ monoserverURL: "https://REPLACETHIS.fly.dev" })`.
+
+Take your `.gitignore` and add `functions`.
+
+### Usage
+
+It's a lot like SvelteKit [Remote Functions](https://github.com/sveltejs/kit/discussions/13897) - you write `.remote.ts` files that use `fn`. For example, this is an echo function:
+```js
+import fn from "monoserve/fn";
+import { type } from "arktype";
+
+export default fn(type("string"), (text) => text);
+```
+And this is a getter function:
+```js
+import fn from "monoserve/fn";
+
+export default fn(() => "resource");
+```
+
+Under the hood, Monoserve's plugin is stubbing the `.remote.ts` file and either hosting a backend for it or bundling the functions to be later deployed.
 
 ## Deploy
 
@@ -35,5 +55,5 @@ Add something like this to your GitHub workflow. It'll use `functions` from bund
 - name: Monoserve
   uses: KTibow/monoserve/deploy@main
   with:
-    config-broker-url: "https://change-this.username.workers.dev"
+    config-broker-url: "https://REPLACETHIS.username.workers.dev"
 ```
