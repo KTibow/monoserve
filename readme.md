@@ -24,7 +24,7 @@ You can write your own as long as it accepts a `github_token` and, if it's for t
 
 Add something like this to your GitHub workflow. It'll use `functions` from bundling and config from your broker.
 ```yaml
-- name: Monoserver
+- name: Monoserve
   uses: KTibow/monoserve/deploy@main
   with:
     config-broker-url: "https://change-this-config-broker.username.workers.dev"

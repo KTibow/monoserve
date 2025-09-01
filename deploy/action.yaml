@@ -1,4 +1,4 @@
-name: Monoserver
+name: Monoserve
 description: Syncs functions onto a Monoserver
 inputs:
   config-broker-url:
