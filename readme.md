@@ -14,11 +14,15 @@ TODO
 
 ## Action: Deploy
 
-### Prep
+### Prep: Config Broker
 
 Monoserve would be a lot more annoying to use if you had to reconfigure everything for every repo. That's why you deploy a config broker to... broker the config.
 
-You can write your own as long as it accepts a `github_token` and, if it's for the expected owner, returns a `github_repo`, a `github_token`, and a `fly_token`, or deploy [worker.js](https://github.com/KTibow/monoserve/blob/main/worker.js) to Cloudflare Workers (set up `EXPECTED_OWNER`, `GITHUB_MONOSERVER_REPO`, `GITHUB_MONOSERVER_TOKEN`, and `FLY_TOKEN`).
+You can write your own as long as it accepts a `github_token` and, if it's for the expected owner, returns a `github_repo`, a `github_token`, and a `fly_token`, or deploy [worker.js](https://github.com/KTibow/monoserve/blob/main/example-worker.js) to Cloudflare Workers (set up `EXPECTED_OWNER`, `GITHUB_MONOSERVER_REPO`, `GITHUB_MONOSERVER_TOKEN`, and `FLY_TOKEN`).
+
+### Prep: Monoserver
+
+You also should create the monoserver ahead of time. This means (in most cases) making a folder, setting up Fly within that folder, setting up Git within that folder, setting up a server (see [Dockerfile](https://github.com/KTibow/monoserve/blob/main/example-Dockerfile), [deno.json](https://github.com/KTibow/monoserve/blob/main/example-deno.json), and [server.ts](https://github.com/KTibow/monoserve/blob/main/example-server.ts)) within that folder, and sending it to GitHub. Don't forget to tell your config broker about the monoserver repo.
 
 ### Usage
 
@@ -27,5 +31,5 @@ Add something like this to your GitHub workflow. It'll use `functions` from bund
 - name: Monoserve
   uses: KTibow/monoserve/deploy@main
   with:
-    config-broker-url: "https://change-this-config-broker.username.workers.dev"
+    config-broker-url: "https://change-this.username.workers.dev"
 ```
