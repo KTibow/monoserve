@@ -151,12 +151,16 @@ export default ({ monoserverURL }: Options): Plugin => {
 
         const response: Response = await createServer(id)
           .then((bundle) => bundle.generate({ format: "esm" }))
-          .then(
-            (generated) =>
-              import(
-                "data:text/javascript;base64," + btoa(generated.output[0].code)
-              ),
-          )
+          .then((generated) => generated.output[0].code)
+          .then((code) => {
+            const encoder = new TextEncoder();
+            const bytes = encoder.encode(code);
+            return bytes.reduce(
+              (acc, byte) => acc + String.fromCharCode(byte),
+              "",
+            );
+          })
+          .then((code) => import("data:text/javascript;base64," + btoa(code)))
           .then(({ default: handler }) => handler(request));
 
         res.statusCode = response.status;

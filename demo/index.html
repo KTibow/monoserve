@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Monoserve Demo</title>
+  </head>
+  <body>
+    <main>
+      <h1>Monoserve Demo</h1>
+      <p>When I go to school:</p>
+      <ul>
+        <li>
+          There are so many good static hosting sites, but they don't allow for
+          server logic.
+        </li>
+        <li>
+          There are a few serverless sites, but they all either have bad latency
+          or are blocked.
+        </li>
+        <li>
+          There are a number of container/VM hosters, but they usually restrict
+          you to one container.
+        </li>
+      </ul>
+      <p>
+        When you have as many projects as me, none of these solutions work on
+        their own.
+        <strong
+          >Monoserve lets you run all your backends on one efficient
+          "monoserver" so you can host your frontend wherever you want.</strong
+        >
+        This version is built for Vite projects and Fly deployment, but you
+        could fork it and make it work differently.
+      </p>
+      <p>
+        If you want to use Monoserve, continue to
+        <a href="https://github.com/KTibow/monoserve">the README</a>. The rest
+        of this page just demonstrates it.
+      </p>
+      <h2>Echo</h2>
+      <div class="stack">
+        <textarea id="input">Hello world!</textarea>
+        <button>→</button>
+        <output></output>
+      </div>
+
+      <p>
+        This is powered by <code>echo.remote.ts</code>, which is literally just
+      </p>
+      <pre>
+import fn from "monoserve/fn";
+import { type } from "arktype";
+
+export default fn(type("string"), (text) => text);
+</pre
+      >
+      <p>
+        This format is heavily inspired by SvelteKit's
+        <a href="https://github.com/sveltejs/kit/discussions/13897"
+          >Remote Functions</a
+        >, but it's a little different. It works in any Vite-based project, not
+        just SvelteKit. It explicitly generates stubs for the client and bundles
+        for the server. And of course, it uses one server.
+      </p>
+    </main>
+    <script type="module" src="/src/app.ts"></script>
+  </body>
+</html>

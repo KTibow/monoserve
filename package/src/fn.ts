@@ -1,23 +1,37 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
-function fn<I, O>(
-  fn: (arg: I) => Promise<O>,
-  schema?: StandardSchemaV1<I>,
-): (arg: I, init?: RequestInit) => Promise<O>;
-function fn<I, O>(
-  schema: StandardSchemaV1<I>,
-  fn: (arg: I) => Promise<O>,
-): (arg: I, init?: RequestInit) => Promise<O>;
+type MaybePromise<T> = T | Promise<T>;
+type InferInput<S> = S extends StandardSchemaV1<infer I, any> ? I : never;
+type InferParsed<S> = S extends StandardSchemaV1<any, infer P> ? P : never;
+
+// Overload 1: no arg
+function fn<O>(
+  inner: () => MaybePromise<O>,
+): (arg?: never, init?: RequestInit) => Promise<O>;
+
+// Overload 2: arg
+function fn<S extends StandardSchemaV1, O>(
+  schema: S,
+  inner: (arg: InferParsed<S>) => MaybePromise<O>,
+): (arg: InferInput<S>, init?: RequestInit) => Promise<O>;
+
 function fn(a: any, b?: any) {
-  const [fn, schema] = typeof a == "function" ? [a, b] : [b, a];
-  return async (arg: any, init?: any) => {
-    if (schema) {
-      const result = await schema["~standard"].validate(arg);
-      if (result.issues) throw new Error("Invalid input");
-      arg = result.value;
-    }
-    return fn(arg);
-  };
+  if (b) {
+    const schema = a as StandardSchemaV1<any, any>;
+    const inner = b as (arg: any) => MaybePromise<any>;
+    return async (input: unknown) => {
+      const result = await schema["~standard"].validate(input);
+      if (result.issues) {
+        throw new Error("Invalid input");
+      }
+      return await inner(result.value);
+    };
+  } else {
+    const inner = a as () => MaybePromise<any>;
+    return async () => {
+      return await inner();
+    };
+  }
 }
 
 export default fn;
