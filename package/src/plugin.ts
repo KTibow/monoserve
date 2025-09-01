@@ -1,4 +1,4 @@
-import type { Plugin } from "vite";
+import type { Plugin, ViteDevServer } from "vite";
 import { rolldown } from "rolldown";
 import { join } from "node:path";
 import { mkdir, readdir, rm } from "node:fs/promises";
@@ -16,10 +16,11 @@ const getHash = async (input: string) => {
 const createClient = (url: string) =>
   `
 import { stringify, parse } from "devalue";
-export default async function(arg) {
+export default async function(arg, init) {
   const res = await fetch(${JSON.stringify(url)}, {
     method: "POST",
     body: stringify(arg),
+    ...init,
   });
 
   if (!res.ok) {
@@ -89,6 +90,81 @@ export default ({ monoserverURL }: Options): Plugin => {
       return {
         code: createClient(fetchURL),
       };
+    },
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use(async (req, res, next) => {
+        if (!req.url?.startsWith("/__monoserve/")) {
+          return next();
+        }
+
+        const hash = req.url.replace("/__monoserve/", "");
+        const id = remoteModules.get(hash);
+        if (!id) {
+          res.statusCode = 404;
+          return res.end("Not found");
+        }
+
+        // Build a Request
+        const host = req.headers?.host
+          ? `http://${req.headers.host}`
+          : "http://localhost";
+        const url = new URL(req.url || "/", host);
+
+        const method = req.method;
+
+        const headersInit: Record<string, string> = {};
+        for (const [key, value] of Object.entries(req.headers || {})) {
+          if (value == undefined) continue;
+          headersInit[key] = Array.isArray(value)
+            ? value.join(",")
+            : String(value);
+        }
+
+        let body: Uint8Array | undefined;
+        const chunks: Uint8Array[] = [];
+        const encoder = new TextEncoder();
+        for await (const chunk of req) {
+          if (typeof chunk === "string") {
+            chunks.push(encoder.encode(chunk));
+          } else {
+            // In Node, Buffer is a Uint8Array subclass, so this will work.
+            // For other environments (like Deno) the chunk will already be a Uint8Array.
+            chunks.push(new Uint8Array(chunk));
+          }
+        }
+        if (chunks.length) {
+          const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+          const combined = new Uint8Array(totalLength);
+          let offset = 0;
+          for (const c of chunks) {
+            combined.set(c, offset);
+            offset += c.length;
+          }
+          body = combined;
+        }
+
+        const request = new Request(url, {
+          method,
+          headers: headersInit,
+          body,
+        });
+
+        const response: Response = await createServer(id)
+          .then((bundle) => bundle.generate({ format: "esm" }))
+          .then(
+            (generated) =>
+              import(
+                "data:text/javascript;base64," + btoa(generated.output[0].code)
+              ),
+          )
+          .then(({ default: handler }) => handler(request));
+
+        res.statusCode = response.status;
+        for (const [key, value] of response.headers) {
+          res.setHeader(key, value);
+        }
+        res.end(await response.text());
+      });
     },
     async closeBundle() {
       if (!isBuild) return;

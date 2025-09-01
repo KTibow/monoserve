@@ -3,14 +3,14 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 function fn<I, O>(
   fn: (arg: I) => Promise<O>,
   schema?: StandardSchemaV1<I>,
-): (arg: I) => Promise<O>;
+): (arg: I, init?: RequestInit) => Promise<O>;
 function fn<I, O>(
   schema: StandardSchemaV1<I>,
   fn: (arg: I) => Promise<O>,
-): (arg: I) => Promise<O>;
+): (arg: I, init?: RequestInit) => Promise<O>;
 function fn(a: any, b?: any) {
   const [fn, schema] = typeof a == "function" ? [a, b] : [b, a];
-  return async (arg: any) => {
+  return async (arg: any, init?: any) => {
     if (schema) {
       const result = await schema["~standard"].validate(arg);
       if (result.issues) throw new Error("Invalid input");
