@@ -45,8 +45,8 @@ export default {
     }
 
     return Response.json({
-      github_repo: env.GITHUB_MONOSERVER_ASSETS_REPO,
-      github_token: env.GITHUB_MONOSERVER_ASSETS_TOKEN,
+      github_repo: env.GITHUB_MONOSERVER_REPO,
+      github_token: env.GITHUB_MONOSERVER_TOKEN,
       fly_token: env.FLY_TOKEN,
     });
   },

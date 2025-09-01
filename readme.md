@@ -18,7 +18,7 @@ TODO
 
 Monoserve would be a lot more annoying to use if you had to reconfigure everything for every repo. That's why you deploy a config broker to... broker the config.
 
-You can write your own as long as it accepts a `github_token` and, if it's for the expected owner, returns a `github_repo`, a `github_token`, and a `fly_token`, or deploy [worker.js](https://github.com/KTibow/monoserve/blob/main/worker.js) to Cloudflare Workers (set up `EXPECTED_OWNER`, `GITHUB_MONOSERVER_ASSETS_REPO`, `GITHUB_MONOSERVER_ASSETS_TOKEN`, and `FLY_TOKEN`).
+You can write your own as long as it accepts a `github_token` and, if it's for the expected owner, returns a `github_repo`, a `github_token`, and a `fly_token`, or deploy [worker.js](https://github.com/KTibow/monoserve/blob/main/worker.js) to Cloudflare Workers (set up `EXPECTED_OWNER`, `GITHUB_MONOSERVER_REPO`, `GITHUB_MONOSERVER_TOKEN`, and `FLY_TOKEN`).
 
 ### Usage
 

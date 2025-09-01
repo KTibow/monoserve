@@ -1,5 +1,5 @@
 name: "Monoserve Deploy"
-description: "Syncs monoserver functions from repo and deploys to Fly"
+description: "Syncs Monoserve functions onto Fly"
 inputs:
   config-broker-url:
     description: "Config broker (probably Cloudflare Worker)"
@@ -20,7 +20,7 @@ runs:
         echo "github_token=$(echo $response | jq -r .github_token)" >> $GITHUB_OUTPUT
         echo "github_repo=$(echo $response | jq -r .github_repo)" >> $GITHUB_OUTPUT
 
-    - name: Clone monoserver functions repo
+    - name: Clone monoserver
       shell: bash
       run: |
         git clone https://x-access-token:${{ steps.auth.outputs.github_token }}@github.com/${{ steps.auth.outputs.github_repo }}.git monoserver-temp
