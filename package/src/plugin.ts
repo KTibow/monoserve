@@ -65,6 +65,10 @@ export default async (req) => {
 }
 `.trimStart(),
   );
+const OUTPUT_OPTIONS = {
+  format: "esm",
+  minify: "dce-only",
+} as const;
 
 export type Options = { monoserverURL: string };
 export default ({ monoserverURL }: Options): Plugin => {
@@ -150,7 +154,7 @@ export default ({ monoserverURL }: Options): Plugin => {
         });
 
         const response: Response = await createServer(id)
-          .then((bundle) => bundle.generate({ format: "esm" }))
+          .then((bundle) => bundle.generate(OUTPUT_OPTIONS))
           .then((generated) => generated.output[0].code)
           .then((code) => {
             const encoder = new TextEncoder();
@@ -186,7 +190,7 @@ export default ({ monoserverURL }: Options): Plugin => {
           const bundle = await createServer(id);
           await bundle.write({
             file: `${functionsDir}/${hash}.js`,
-            format: "esm",
+            ...OUTPUT_OPTIONS,
           });
         }),
       );
