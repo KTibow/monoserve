@@ -3,6 +3,7 @@ import { rolldown, type InputOptions, type OutputOptions } from "rolldown";
 import { join } from "node:path";
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { cwd } from "node:process";
 
 const getHash = async (input: string) => {
   const encoder = new TextEncoder();
@@ -51,11 +52,13 @@ export default async (req) => {
 
 export type Options = {
   monoserverURL: string;
+  tempLocation?: string;
   rolldownInputOptions?: InputOptions;
   rolldownOutputOptions?: OutputOptions;
 };
 export default ({
   monoserverURL,
+  tempLocation = tmpdir(),
   rolldownInputOptions,
   rolldownOutputOptions,
 }: Options): Plugin => {
@@ -161,13 +164,16 @@ export default ({
           body,
         });
 
-        const tmp = tmpdir();
         const response: Response = await Promise.resolve(createServer(id))
           .then((code) => bundle(code))
           .then((bundle) => bundle.generate(rolldownOutputOptions))
           .then((generated) => generated.output[0].code)
           .then(async (code) => {
-            const path = join(tmp, `monoserve-${crypto.randomUUID()}.js`);
+            const path = join(
+              tempLocation.startsWith("./") ? cwd() : "",
+              tempLocation,
+              `monoserve-${crypto.randomUUID()}.js`,
+            );
             await writeFile(path, code);
             const { default: handler } = await import(path);
 
