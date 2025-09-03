@@ -1,5 +1,5 @@
 import type { Plugin, ViteDevServer } from "vite";
-import { rolldown } from "rolldown";
+import { rolldown, type InputOptions, type OutputOptions } from "rolldown";
 import { join } from "node:path";
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -31,25 +31,8 @@ export default async function(arg, init) {
   return parse(await res.text());
 }
 `.trimStart();
-const bundle = async (js: string) =>
-  rolldown({
-    // Uses virtual modules
-    input: "entry",
-    plugins: [
-      {
-        name: "virtual",
-        resolveId(id) {
-          if (id == "entry") return id;
-        },
-        load(id) {
-          if (id == "entry") return js;
-        },
-      },
-    ],
-  });
 const createServer = (path: string) =>
-  bundle(
-    `
+  `
 import { parse, stringify } from "devalue";
 import fn from "${path}";
 export default async (req) => {
@@ -64,15 +47,39 @@ export default async (req) => {
     return new Response(e.message || "Error", { status: 500 });
   }
 }
-`.trimStart(),
-  );
-const OUTPUT_OPTIONS = {
-  format: "esm",
-  minify: "dce-only",
-} as const;
+`.trimStart();
 
-export type Options = { monoserverURL: string };
-export default ({ monoserverURL }: Options): Plugin => {
+export type Options = {
+  monoserverURL: string;
+  rolldownInputOptions?: InputOptions;
+  rolldownOutputOptions?: OutputOptions;
+};
+export default ({
+  monoserverURL,
+  rolldownInputOptions,
+  rolldownOutputOptions,
+}: Options): Plugin => {
+  const bundle = async (js: string) =>
+    rolldown({
+      // Uses virtual modules
+      input: "entry",
+      plugins: [
+        {
+          name: "virtual",
+          resolveId(id) {
+            if (id == "entry") return id;
+          },
+          load(id) {
+            if (id == "entry") return js;
+          },
+        },
+      ],
+      ...rolldownInputOptions,
+    });
+  rolldownOutputOptions ||= {};
+  rolldownOutputOptions.format ||= "esm";
+  rolldownOutputOptions.minify ||= "dce-only";
+
   const remoteModules = new Map<string, string>();
   let isBuild = false;
 
@@ -155,8 +162,9 @@ export default ({ monoserverURL }: Options): Plugin => {
         });
 
         const tmp = tmpdir();
-        const response: Response = await createServer(id)
-          .then((bundle) => bundle.generate(OUTPUT_OPTIONS))
+        const response: Response = await Promise.resolve(createServer(id))
+          .then((code) => bundle(code))
+          .then((bundle) => bundle.generate(rolldownOutputOptions))
           .then((generated) => generated.output[0].code)
           .then(async (code) => {
             const path = join(tmp, `monoserve-${crypto.randomUUID()}.js`);
@@ -188,13 +196,16 @@ export default ({ monoserverURL }: Options): Plugin => {
       }
 
       await Promise.all(
-        Array.from(remoteModules.entries()).map(async ([hash, id]) => {
-          const bundle = await createServer(id);
-          await bundle.write({
-            file: `${functionsDir}/${hash}.js`,
-            ...OUTPUT_OPTIONS,
-          });
-        }),
+        Array.from(remoteModules.entries()).map(([hash, id]) =>
+          Promise.resolve(createServer(id))
+            .then((code) => bundle(code))
+            .then((bundle) =>
+              bundle.write({
+                ...rolldownOutputOptions,
+                file: `${functionsDir}/${hash}.js`,
+              }),
+            ),
+        ),
       );
     },
   };

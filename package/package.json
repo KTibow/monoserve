@@ -1,6 +1,6 @@
 {
   "name": "monoserve",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "type": "module",
   "license": "MIT",
   "homepage": "https://github.com/KTibow/monoserve/tree/main/package#readme",
