@@ -29,6 +29,10 @@ export default async function(arg, init) {
     throw new Error(await res.text());
   }
 
+  const contentType = res.headers.get("content-type");
+  if (!contentType?.includes("application/json")) {
+    return res;
+  }
   return parse(await res.text());
 }
 `.trimStart();
@@ -43,7 +47,10 @@ export default async (req) => {
   const arg = await req.text().then(t => parse(t));
   try {
     const result = await fn(arg);
-    return new Response(stringify(result), { status: 200 });
+    if (result instanceof Response) {
+      return result;
+    }
+    return new Response(stringify(result), { status: 200, headers: { "content-type": "application/json" } });
   } catch (e) {
     return new Response(e.message || "Error", { status: 500 });
   }
