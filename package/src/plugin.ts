@@ -1,6 +1,6 @@
 import type { Plugin, ViteDevServer } from "vite";
 import { rolldown, type InputOptions, type OutputOptions } from "rolldown";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { cwd } from "node:process";
@@ -174,6 +174,8 @@ export default ({
               tempLocation,
               `monoserve-${crypto.randomUUID()}.js`,
             );
+            const folder = dirname(path);
+            await mkdir(folder, { recursive: true });
             await writeFile(path, code);
             const { default: handler } = await import(path);
 
