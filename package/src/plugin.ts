@@ -1,7 +1,8 @@
 import type { Plugin, ViteDevServer } from "vite";
 import { rolldown } from "rolldown";
 import { join } from "node:path";
-import { mkdir, readdir, rm } from "node:fs/promises";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 
 const getHash = async (input: string) => {
   const encoder = new TextEncoder();
@@ -153,19 +154,20 @@ export default ({ monoserverURL }: Options): Plugin => {
           body,
         });
 
+        const tmp = tmpdir();
         const response: Response = await createServer(id)
           .then((bundle) => bundle.generate(OUTPUT_OPTIONS))
           .then((generated) => generated.output[0].code)
-          .then((code) => {
-            const encoder = new TextEncoder();
-            const bytes = encoder.encode(code);
-            return bytes.reduce(
-              (acc, byte) => acc + String.fromCharCode(byte),
-              "",
-            );
-          })
-          .then((code) => import("data:text/javascript;base64," + btoa(code)))
-          .then(({ default: handler }) => handler(request));
+          .then(async (code) => {
+            const path = join(tmp, `monoserve-${crypto.randomUUID()}.js`);
+            await writeFile(path, code);
+            const { default: handler } = await import(path);
+
+            const response = await handler(request);
+
+            await rm(path);
+            return response;
+          });
 
         res.statusCode = response.status;
         for (const [key, value] of response.headers) {
