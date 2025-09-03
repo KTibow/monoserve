@@ -1,9 +1,10 @@
-import type { Plugin, ViteDevServer } from "vite";
+import type { Connect, Plugin, ViteDevServer } from "vite";
 import { rolldown, type InputOptions, type OutputOptions } from "rolldown";
 import { dirname, join } from "node:path";
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { cwd } from "node:process";
+import type { ServerResponse } from "node:http";
 
 const getHash = async (input: string) => {
   const encoder = new TextEncoder();
@@ -56,6 +57,65 @@ export default async (req) => {
   }
 }
 `.trimStart();
+const toRequest = async (req: Connect.IncomingMessage) => {
+  const host = req.headers?.host
+    ? `http://${req.headers.host}`
+    : "http://localhost";
+  const url = new URL(req.url || "/", host);
+
+  const method = req.method;
+
+  const headersInit: Record<string, string> = {};
+  for (const [key, value] of Object.entries(req.headers || {})) {
+    if (value == undefined) continue;
+    headersInit[key] = Array.isArray(value) ? value.join(",") : String(value);
+  }
+
+  let body: Uint8Array | undefined;
+  const chunks: Uint8Array[] = [];
+  const encoder = new TextEncoder();
+  for await (const chunk of req) {
+    if (typeof chunk === "string") {
+      chunks.push(encoder.encode(chunk));
+    } else {
+      // In Node, Buffer is a Uint8Array subclass, so this will work.
+      // For other environments (like Deno) the chunk will already be a Uint8Array.
+      chunks.push(new Uint8Array(chunk));
+    }
+  }
+  if (chunks.length) {
+    const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+    const combined = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const c of chunks) {
+      combined.set(c, offset);
+      offset += c.length;
+    }
+    body = combined;
+  }
+
+  return new Request(url, {
+    method,
+    headers: headersInit,
+    body,
+  });
+};
+const sendResponse = async (res: ServerResponse, response: Response) => {
+  res.statusCode = response.status;
+  for (const [key, value] of response.headers) {
+    res.setHeader(key, value);
+  }
+  // Stream the response body back to the client
+  const body = response.body;
+  if (!body) {
+    return res.end();
+  }
+
+  for await (const value of body) {
+    res.write(value);
+  }
+  res.end();
+};
 
 export type Options = {
   monoserverURL: string;
@@ -127,49 +187,7 @@ export default ({
         }
 
         // Build a Request
-        const host = req.headers?.host
-          ? `http://${req.headers.host}`
-          : "http://localhost";
-        const url = new URL(req.url || "/", host);
-
-        const method = req.method;
-
-        const headersInit: Record<string, string> = {};
-        for (const [key, value] of Object.entries(req.headers || {})) {
-          if (value == undefined) continue;
-          headersInit[key] = Array.isArray(value)
-            ? value.join(",")
-            : String(value);
-        }
-
-        let body: Uint8Array | undefined;
-        const chunks: Uint8Array[] = [];
-        const encoder = new TextEncoder();
-        for await (const chunk of req) {
-          if (typeof chunk === "string") {
-            chunks.push(encoder.encode(chunk));
-          } else {
-            // In Node, Buffer is a Uint8Array subclass, so this will work.
-            // For other environments (like Deno) the chunk will already be a Uint8Array.
-            chunks.push(new Uint8Array(chunk));
-          }
-        }
-        if (chunks.length) {
-          const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
-          const combined = new Uint8Array(totalLength);
-          let offset = 0;
-          for (const c of chunks) {
-            combined.set(c, offset);
-            offset += c.length;
-          }
-          body = combined;
-        }
-
-        const request = new Request(url, {
-          method,
-          headers: headersInit,
-          body,
-        });
+        const request = await toRequest(req);
 
         const response: Response = await Promise.resolve(createServer(id))
           .then((code) => bundle(code))
@@ -192,11 +210,7 @@ export default ({
             return response;
           });
 
-        res.statusCode = response.status;
-        for (const [key, value] of response.headers) {
-          res.setHeader(key, value);
-        }
-        res.end(await response.text());
+        await sendResponse(res, response);
       });
     },
     async closeBundle() {
