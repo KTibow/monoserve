@@ -5,6 +5,7 @@ import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { cwd } from "node:process";
 import type { ServerResponse } from "node:http";
+import { genEnv } from "./gen-env";
 
 const getHash = async (input: string) => {
   const encoder = new TextEncoder();
@@ -137,10 +138,11 @@ export default ({
         {
           name: "virtual",
           resolveId(id) {
-            if (id == "entry") return id;
+            if (id == "entry" || id == "$env/static/private") return id;
           },
-          load(id) {
+          async load(id) {
             if (id == "entry") return js;
+            if (id == "$env/static/private") return await genEnv();
           },
         },
       ],

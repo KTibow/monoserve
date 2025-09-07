@@ -19,6 +19,9 @@
     "./fn": "./dist/fn.js",
     "./package.json": "./package.json"
   },
+  "bin": {
+    "monoserve-gen-env": "./dist/gen-env-cli.js"
+  },
   "publishConfig": {
     "access": "public"
   },
