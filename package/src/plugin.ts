@@ -1,4 +1,4 @@
-import type { Connect, Plugin, ViteDevServer } from "vite";
+import { loadEnv, type Connect, type Plugin, type ViteDevServer } from "vite";
 import { rolldown, type InputOptions, type OutputOptions } from "rolldown";
 import { dirname, join } from "node:path";
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
@@ -142,7 +142,7 @@ export default ({
           },
           async load(id) {
             if (id == "entry") return js;
-            if (id == "$env/static/private") return await genEnv();
+            if (id == "$env/static/private") return await genEnv(env);
           },
         },
       ],
@@ -154,11 +154,13 @@ export default ({
 
   const remoteModules = new Map<string, string>();
   let isBuild = false;
+  let env: Record<string, string>;
 
   return {
     name: "vite-plugin-monoserve",
     configResolved(config) {
       isBuild = config.command == "build";
+      env = loadEnv(config.mode, config.root, "");
     },
     async transform(code, id) {
       const isRemote = id.endsWith(".remote.ts") || id.endsWith(".remote.js");
