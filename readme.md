@@ -14,7 +14,7 @@ When you have as many projects as me, none of these solutions work on their own.
 
 Install both of `monoserve devalue` with your favorite package manager.
 
-Update your `vite.config.js` to `import monoserve from "monoserve/plugin"`, and make sure your `plugins` has something like `monoserve({ monoserverURL: "https://REPLACETHIS.fly.dev" })`.
+Update your `vite.config.js` to `import { monoserve } from "monoserve/plugin"`, and make sure your `plugins` has something like `monoserve({ monoserverURL: "https://REPLACETHIS.fly.dev" })`.
 
 Take your `.gitignore` and add `functions`.
 
@@ -22,14 +22,14 @@ Take your `.gitignore` and add `functions`.
 
 It's a lot like SvelteKit [Remote Functions](https://github.com/sveltejs/kit/discussions/13897) - you write `.remote.ts` files that use `fn`. For example, this is an echo function:
 ```js
-import fn from "monoserve/fn";
+import { fn } from "monoserve";
 import { type } from "arktype";
 
 export default fn(type("string"), (text) => text);
 ```
 And this is a getter function:
 ```js
-import fn from "monoserve/fn";
+import { fn } from "monoserve";
 
 export default fn(() => "resource");
 ```

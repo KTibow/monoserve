@@ -49,7 +49,7 @@
         This is powered by <code>echo.remote.ts</code>, which is literally just
       </p>
       <pre>
-import fn from "monoserve/fn";
+import { fn } from "monoserve";
 import { type } from "arktype";
 
 export default fn(type("string"), (text) => text);

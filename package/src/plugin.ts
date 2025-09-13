@@ -124,7 +124,7 @@ export type Options = {
   rolldownInputOptions?: InputOptions;
   rolldownOutputOptions?: OutputOptions;
 };
-export default ({
+export const monoserve = ({
   monoserverURL,
   tempLocation = tmpdir(),
   rolldownInputOptions,

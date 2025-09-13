@@ -5,17 +5,17 @@ type InferInput<S> = S extends StandardSchemaV1<infer I, any> ? I : never;
 type InferParsed<S> = S extends StandardSchemaV1<any, infer P> ? P : never;
 
 // Overload 1: no arg
-function fn<O>(
+export function fn<O>(
   inner: () => MaybePromise<O>,
 ): (arg?: never, init?: RequestInit) => Promise<O>;
 
 // Overload 2: arg
-function fn<S extends StandardSchemaV1, O>(
+export function fn<S extends StandardSchemaV1, O>(
   schema: S,
   inner: (arg: InferParsed<S>) => MaybePromise<O>,
 ): (arg: InferInput<S>, init?: RequestInit) => Promise<O>;
 
-function fn(a: any, b?: any) {
+export function fn(a: any, b?: any) {
   if (b) {
     const schema = a as StandardSchemaV1<any, any>;
     const inner = b as (arg: any) => MaybePromise<any>;
@@ -33,5 +33,3 @@ function fn(a: any, b?: any) {
     };
   }
 }
-
-export default fn;

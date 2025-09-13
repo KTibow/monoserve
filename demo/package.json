@@ -10,10 +10,9 @@
     "preview": "vite preview"
   },
   "devDependencies": {
-    "arktype": "^2.1.20",
+    "arktype": "^2.1.22",
     "devalue": "^5.3.2",
     "monoserve": "link:../package",
-    "typescript": "~5.8.3",
-    "vite": "^7.1.2"
+    "typescript": "~5.8.3"
   }
 }
