@@ -8,9 +8,6 @@ importers:
 
   .:
     devDependencies:
-      arktype:
-        specifier: ^2.1.22
-        version: 2.1.22
       devalue:
         specifier: ^5.3.2
         version: 5.3.2
@@ -20,17 +17,14 @@ importers:
       typescript:
         specifier: ~5.8.3
         version: 5.8.3
+      valibot:
+        specifier: ^1.1.0
+        version: 1.1.0(typescript@5.8.3)
       vite:
         specifier: ^7.1.5
         version: 7.1.5
 
 packages:
-
-  '@ark/schema@0.49.0':
-    resolution: {integrity: sha512-GphZBLpW72iS0v4YkeUtV3YIno35Gimd7+ezbPO9GwEi9kzdUrPVjvf6aXSBAfHikaFc/9pqZOpv3pOXnC71tw==}
-
-  '@ark/util@0.49.0':
-    resolution: {integrity: sha512-/BtnX7oCjNkxi2vi6y1399b+9xd1jnCrDYhZ61f0a+3X8x8DxlK52VgEEzyuC2UQMPACIfYrmHkhD3lGt2GaMA==}
 
   '@esbuild/aix-ppc64@0.25.9':
     resolution: {integrity: sha512-OaGtL73Jck6pBKjNIe24BnFE6agGl+6KxDtTfHhy1HmhthfKouEcOhqpSL64K4/0WCtbKFLOdzD/44cJ4k9opA==}
@@ -296,9 +290,6 @@ packages:
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
-  arktype@2.1.22:
-    resolution: {integrity: sha512-xdzl6WcAhrdahvRRnXaNwsipCgHuNoLobRqhiP8RjnfL9Gp947abGlo68GAIyLtxbD+MLzNyH2YR4kEqioMmYQ==}
-
   devalue@5.3.2:
     resolution: {integrity: sha512-UDsjUbpQn9kvm68slnrs+mfxwFkIflOhkanmyabZ8zOYk8SMEIbJ3TK+88g70hSIeytu4y18f0z/hYHMTrXIWw==}
 
@@ -355,6 +346,14 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  valibot@1.1.0:
+    resolution: {integrity: sha512-Nk8lX30Qhu+9txPYTwM0cFlWLdPFsFr6LblzqIySfbZph9+BFsAHsNvHOymEviUepeIW6KFHzpX8TKhbptBXXw==}
+    peerDependencies:
+      typescript: '>=5'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
   vite@7.1.5:
     resolution: {integrity: sha512-4cKBO9wR75r0BeIWWWId9XK9Lj6La5X846Zw9dFfzMRw38IlTk2iCcUt6hsyiDRcPidc55ZParFYDXi0nXOeLQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -396,12 +395,6 @@ packages:
         optional: true
 
 snapshots:
-
-  '@ark/schema@0.49.0':
-    dependencies:
-      '@ark/util': 0.49.0
-
-  '@ark/util@0.49.0': {}
 
   '@esbuild/aix-ppc64@0.25.9':
     optional: true
@@ -546,11 +539,6 @@ snapshots:
 
   '@types/estree@1.0.8': {}
 
-  arktype@2.1.22:
-    dependencies:
-      '@ark/schema': 0.49.0
-      '@ark/util': 0.49.0
-
   devalue@5.3.2: {}
 
   esbuild@0.25.9:
@@ -636,6 +624,10 @@ snapshots:
       picomatch: 4.0.3
 
   typescript@5.8.3: {}
+
+  valibot@1.1.0(typescript@5.8.3):
+    optionalDependencies:
+      typescript: 5.8.3
 
   vite@7.1.5:
     dependencies:

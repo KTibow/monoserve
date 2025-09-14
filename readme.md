@@ -23,9 +23,9 @@ Take your `.gitignore` and add `functions`.
 It's a lot like SvelteKit [Remote Functions](https://github.com/sveltejs/kit/discussions/13897) - you write `.remote.ts` files that use `fn`. For example, this is an echo function:
 ```js
 import { fn } from "monoserve";
-import { type } from "arktype";
+import { string } from "valibot";
 
-export default fn(type("string"), (text) => text);
+export default fn(string(), (text) => text);
 ```
 And this is a getter function:
 ```js

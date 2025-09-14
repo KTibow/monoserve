@@ -1,4 +1,4 @@
 import { fn } from "monoserve";
-import { type } from "arktype";
+import { string } from "valibot";
 
-export default fn(type("string"), (text) => text);
+export default fn(string(), (text) => text);
