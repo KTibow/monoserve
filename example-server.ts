@@ -24,31 +24,36 @@ Deno.serve({ port: PORT }, async (request) => {
 
   // CORS
   const origin = request.headers.get("origin") || "";
-  let headers: HeadersInit = {};
-  if (
+  const originTrusted =
     /http:\/\/localhost:\d+/.test(origin) ||
     // check for your app here
-    false
-  ) {
-    headers = {
-      "Access-Control-Allow-Origin": origin,
-      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    };
-    // Handle preflight
-    if (request.method == "OPTIONS") {
-      return new Response(null, {
-        status: 204,
-        headers,
-      });
-    }
+    false;
+  const headers: HeadersInit = originTrusted
+    ? {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+      }
+    : {};
+
+  if (request.method == "OPTIONS") {
+    // Preflight
+    return new Response(null, {
+      status: 204,
+      headers,
+    });
+  }
+  if (!originTrusted && request.headers.get("upgrade") == "websocket") {
+    // Security: only allow websockets from trusted origins
+    return new Response("Forbidden", { status: 403 });
   }
 
   const { default: run } = await import(fn);
   const response = await run(request);
 
-  // Attach CORS headers
-  for (const [key, value] of Object.entries(headers)) {
-    response.headers.set(key, value);
+  if (response.status != 101) {
+    for (const [key, value] of Object.entries(headers)) {
+      response.headers.set(key, value);
+    }
   }
 
   return response;

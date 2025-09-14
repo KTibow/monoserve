@@ -71,9 +71,6 @@ export function fnWebSocket(
     if (req.method != "GET") {
       return new Response("Method not allowed", { status: 405 });
     }
-    if (req.headers.get("upgrade") != "websocket") {
-      return new Response("Bad request", { status: 400 });
-    }
     const { socket, response } = Deno.upgradeWebSocket(req);
     Promise.resolve(inner(socket, req)).catch((err) => {
       console.error("WebSocket error:", err);
