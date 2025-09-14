@@ -186,8 +186,8 @@ export const monoserve = ({
           return next();
         }
 
-        const hash = req.url.replace("/__monoserve/", "");
-        const id = remoteModules.get(hash);
+        const fId = req.url.replace("/__monoserve/", "");
+        const id = remoteModules.get(fId);
         if (!id) {
           res.statusCode = 404;
           return res.end("Not found");
@@ -201,10 +201,11 @@ export const monoserve = ({
           .then((bundle) => bundle.generate(rolldownOutputOptions))
           .then((generated) => generated.output[0].code)
           .then(async (code) => {
+            const hash = await getHash(code);
             const path = join(
               tempLocation.startsWith("./") ? cwd() : "",
               tempLocation,
-              `monoserve-${crypto.randomUUID()}.js`,
+              `monoserve-${hash.slice(0, 10)}.js`,
             );
             const folder = dirname(path);
             await mkdir(folder, { recursive: true });
