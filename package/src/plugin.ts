@@ -38,25 +38,39 @@ export default async function(arg, init) {
   return parse(await res.text());
 }
 `.trimStart();
+const createRawClient = (url: string) =>
+  `
+export default async function(init) {
+  return await fetch(${JSON.stringify(url)}, {
+    method: "POST",
+    ...init,
+  });
+}
+`.trimStart();
 const createServer = (path: string) =>
   `
 import { parse, stringify } from "devalue";
 import fn from "${path}";
-export default async (req) => {
-  if (req.method != "POST") {
-    return new Response("Method not allowed", { status: 405 });
-  }
-  const arg = await req.text().then(t => parse(t));
-  try {
-    const result = await fn(arg);
-    if (result instanceof Response) {
-      return result;
-    }
-    return new Response(stringify(result), { status: 200, headers: { "content-type": "application/json" } });
-  } catch (e) {
-    return new Response(e.message || "Error", { status: 500 });
-  }
-}
+export default "_raw" in fn
+  ? fn
+  : async (req) => {
+      if (req.method != "POST") {
+        return new Response("Method not allowed", { status: 405 });
+      }
+      const arg = await req.text().then((t) => parse(t));
+      try {
+        const result = await fn(arg);
+        if (result instanceof Response) {
+          return result;
+        }
+        return new Response(stringify(result), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      } catch (e) {
+        return new Response(e.message || "Error", { status: 500 });
+      }
+    };
 `.trimStart();
 const toRequest = async (req: Connect.IncomingMessage) => {
   const host = req.headers?.host
@@ -173,9 +187,10 @@ export const monoserve = ({
       const fetchURL = isBuild
         ? `${monoserverURL.replace(/\/$/, "")}/${hash}`
         : `/__monoserve/${hash}`;
-      return {
-        code: createClient(fetchURL),
-      };
+      const client = code.includes("fnRaw")
+        ? createRawClient(fetchURL)
+        : createClient(fetchURL);
+      return { code: client };
     },
     configureServer(server: ViteDevServer) {
       server.middlewares.use(async (req, res, next) => {

@@ -33,3 +33,12 @@ export function fn(a: any, b?: any) {
     };
   }
 }
+
+type RawClient = (init: RequestInit) => Promise<Response>;
+export function fnRaw(inner: (req: Request) => MaybePromise<Response>) {
+  const output = async (req: Request) => {
+    return await inner(req);
+  };
+  output._raw = true;
+  return output as unknown as RawClient;
+}
