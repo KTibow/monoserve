@@ -1,7 +1,7 @@
-import { loadEnv, type Connect, type Plugin, type ViteDevServer } from "vite";
+import { loadEnv, type Connect, type Plugin } from "vite";
 import { rolldown, type InputOptions, type OutputOptions } from "rolldown";
 import { dirname, join } from "node:path";
-import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { cwd } from "node:process";
 import type { ServerResponse } from "node:http";
@@ -47,30 +47,11 @@ export default async function(init) {
   });
 }
 `.trimStart();
-const createServer = (path: string) =>
+const createWebSocketClient = (url: string) =>
   `
-import { parse, stringify } from "devalue";
-import fn from "${path}";
-export default "_raw" in fn
-  ? fn
-  : async (req) => {
-      if (req.method != "POST") {
-        return new Response("Method not allowed", { status: 405 });
-      }
-      const arg = await req.text().then((t) => parse(t));
-      try {
-        const result = await fn(arg);
-        if (result instanceof Response) {
-          return result;
-        }
-        return new Response(stringify(result), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
-      } catch (e) {
-        return new Response(e.message || "Error", { status: 500 });
-      }
-    };
+export default function() {
+  return new WebSocket(${JSON.stringify(url)});
+}
 `.trimStart();
 const toRequest = async (req: Connect.IncomingMessage) => {
   const host = req.headers?.host
@@ -93,12 +74,15 @@ const toRequest = async (req: Connect.IncomingMessage) => {
     }
   }
 
-  return new Request(url, {
+  const init: RequestInit = {
     method,
     headers,
-    body: req, // yeah it's a readable stream
-    duplex: "half", // we must do this as Requests were designed to be sent, not received
-  });
+  };
+  if (method != "GET" && method != "HEAD") {
+    init.body = req;
+    init.duplex = "half";
+  }
+  return new Request(url, init);
 };
 const sendResponse = async (res: ServerResponse, response: Response) => {
   res.statusCode = response.status;
@@ -121,7 +105,7 @@ const sendResponse = async (res: ServerResponse, response: Response) => {
 };
 
 export type Options = {
-  monoserverURL: string;
+  monoserverURL: string; // set to /__monoserve/ to preview locally
   tempLocation?: string;
   rolldownInputOptions?: InputOptions;
   rolldownOutputOptions?: OutputOptions;
@@ -132,18 +116,17 @@ export const monoserve = ({
   rolldownInputOptions,
   rolldownOutputOptions,
 }: Options): Plugin => {
-  const bundle = async (js: string) =>
+  const functionsDir = join(process.cwd(), "functions");
+  const bundle = async (path: string) =>
     rolldown({
-      // Uses virtual modules
-      input: "entry",
+      input: path,
       plugins: [
         {
           name: "virtual",
           resolveId(id) {
-            if (id == "entry" || id == "$env/static/private") return id;
+            if (id == "$env/static/private") return id;
           },
           async load(id) {
-            if (id == "entry") return js;
             if (id == "$env/static/private") return await genEnv(env);
           },
         },
@@ -177,10 +160,12 @@ export const monoserve = ({
         : `/__monoserve/${hash}`;
       const client = code.includes("fnRaw")
         ? createRawClient(fetchURL)
-        : createClient(fetchURL);
+        : code.includes("fnWebSocket")
+          ? createWebSocketClient(fetchURL)
+          : createClient(fetchURL);
       return { code: client };
     },
-    configureServer(server: ViteDevServer) {
+    configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         if (!req.url?.startsWith("/__monoserve/")) {
           return next();
@@ -196,8 +181,7 @@ export const monoserve = ({
         // Build a Request
         const request = await toRequest(req);
 
-        const response: Response = await Promise.resolve(createServer(id))
-          .then((code) => bundle(code))
+        const response: Response = await bundle(id)
           .then((bundle) => bundle.generate(rolldownOutputOptions))
           .then((generated) => generated.output[0].code)
           .then(async (code) => {
@@ -221,10 +205,26 @@ export const monoserve = ({
         await sendResponse(res, response);
       });
     },
+    configurePreviewServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        if (!req.url?.startsWith("/__monoserve/")) {
+          return next();
+        }
+
+        const fId = req.url.replace("/__monoserve/", "");
+
+        const request = await toRequest(req);
+
+        const response: Response = await import(
+          `${functionsDir}/${fId}.js`
+        ).then(({ default: handler }) => handler(request));
+
+        await sendResponse(res, response);
+      });
+    },
     async closeBundle() {
       if (!isBuild) return;
 
-      const functionsDir = join(process.cwd(), "functions");
       try {
         const files = await readdir(functionsDir);
         await Promise.all(files.map((file) => rm(join(functionsDir, file))));
@@ -234,14 +234,12 @@ export const monoserve = ({
 
       await Promise.all(
         Array.from(remoteModules.entries()).map(([hash, id]) =>
-          Promise.resolve(createServer(id))
-            .then((code) => bundle(code))
-            .then((bundle) =>
-              bundle.write({
-                ...rolldownOutputOptions,
-                file: `${functionsDir}/${hash}.js`,
-              }),
-            ),
+          bundle(id).then((bundle) =>
+            bundle.write({
+              ...rolldownOutputOptions,
+              file: `${functionsDir}/${hash}.js`,
+            }),
+          ),
         ),
       );
     },
