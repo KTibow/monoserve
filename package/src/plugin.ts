@@ -80,10 +80,17 @@ const toRequest = async (req: Connect.IncomingMessage) => {
 
   const method = req.method;
 
-  const headersInit: Record<string, string> = {};
+  const headers = new Headers();
   for (const [key, value] of Object.entries(req.headers || {})) {
+    if (key.startsWith(":")) continue;
     if (value == undefined) continue;
-    headersInit[key] = Array.isArray(value) ? value.join(",") : String(value);
+    if (Array.isArray(value)) {
+      for (const v of value) {
+        headers.append(key, v);
+      }
+    } else {
+      headers.set(key, value);
+    }
   }
 
   let body: Uint8Array | undefined;
@@ -111,7 +118,7 @@ const toRequest = async (req: Connect.IncomingMessage) => {
 
   return new Request(url, {
     method,
-    headers: headersInit,
+    headers,
     body,
   });
 };
