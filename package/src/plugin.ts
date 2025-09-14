@@ -105,16 +105,19 @@ const sendResponse = async (res: ServerResponse, response: Response) => {
   for (const [key, value] of response.headers) {
     res.setHeader(key, value);
   }
-  // Stream the response body back to the client
-  const body = response.body;
-  if (!body) {
-    return res.end();
-  }
+  res.writeHead(response.status);
 
-  for await (const value of body) {
-    res.write(value);
+  // Stream the response body back to the client
+  try {
+    const body = response.body;
+    if (!body) return;
+
+    for await (const value of body) {
+      res.write(value);
+    }
+  } finally {
+    res.end();
   }
-  res.end();
 };
 
 export type Options = {
