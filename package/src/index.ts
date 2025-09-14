@@ -5,6 +5,13 @@ type MaybePromise<T> = T | Promise<T>;
 type InferInput<S> = S extends StandardSchemaV1<infer I, any> ? I : never;
 type InferParsed<S> = S extends StandardSchemaV1<any, infer P> ? P : never;
 
+const wrap =
+  (f: (request: Request) => MaybePromise<Response>) => (request: Request) =>
+    Promise.resolve(f(request)).catch((err) => {
+      console.error(err);
+      return new Response("Internal server error", { status: 500 });
+    });
+
 // Overload 1: no arg
 export function fn<O>(
   inner: () => MaybePromise<O>,
@@ -15,13 +22,6 @@ export function fn<S extends StandardSchemaV1, O>(
   schema: S,
   inner: (arg: InferParsed<S>) => MaybePromise<O>,
 ): (arg: InferInput<S>, init?: RequestInit) => Promise<O>;
-
-const wrap =
-  (f: (request: Request) => MaybePromise<Response>) => (request: Request) =>
-    Promise.resolve(f(request)).catch((err) => {
-      console.error(err);
-      return new Response("Internal server error", { status: 500 });
-    });
 
 export function fn(a: any, b?: any) {
   const wrapExt = (logic: (arg?: unknown) => any) =>
@@ -67,7 +67,7 @@ export function fnWebSocket(
   if (typeof Deno == "undefined") {
     throw new Error("WebSocket not supported in this environment");
   }
-  return wrap(async (req: Request) => {
+  return wrap((req: Request) => {
     if (req.method != "GET") {
       return new Response("Method not allowed", { status: 405 });
     }
