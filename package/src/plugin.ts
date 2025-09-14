@@ -82,7 +82,7 @@ const toRequest = async (req: Connect.IncomingMessage) => {
 
   const headers = new Headers();
   for (const [key, value] of Object.entries(req.headers || {})) {
-    if (key.startsWith(":")) continue;
+    if (key.startsWith(":")) continue; // psuedo-headers
     if (value == undefined) continue;
     if (Array.isArray(value)) {
       for (const v of value) {
@@ -93,33 +93,11 @@ const toRequest = async (req: Connect.IncomingMessage) => {
     }
   }
 
-  let body: Uint8Array | undefined;
-  const chunks: Uint8Array[] = [];
-  const encoder = new TextEncoder();
-  for await (const chunk of req) {
-    if (typeof chunk === "string") {
-      chunks.push(encoder.encode(chunk));
-    } else {
-      // In Node, Buffer is a Uint8Array subclass, so this will work.
-      // For other environments (like Deno) the chunk will already be a Uint8Array.
-      chunks.push(new Uint8Array(chunk));
-    }
-  }
-  if (chunks.length) {
-    const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
-    const combined = new Uint8Array(totalLength);
-    let offset = 0;
-    for (const c of chunks) {
-      combined.set(c, offset);
-      offset += c.length;
-    }
-    body = combined;
-  }
-
   return new Request(url, {
     method,
     headers,
-    body,
+    body: req, // yeah it's a readable stream
+    duplex: "half", // we must do this as Requests were designed to be sent, not received
   });
 };
 const sendResponse = async (res: ServerResponse, response: Response) => {
