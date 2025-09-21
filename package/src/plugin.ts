@@ -136,6 +136,7 @@ export const monoserve = ({
   rolldownOutputOptions ||= {};
   rolldownOutputOptions.format ||= "esm";
   rolldownOutputOptions.minify ||= "dce-only";
+  rolldownOutputOptions.inlineDynamicImports = true;
 
   const remoteModules = new Map<string, string>();
   let isBuild = false;
