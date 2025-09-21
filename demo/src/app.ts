@@ -1,6 +1,5 @@
 import "./app.css";
 import echo from "./echo.remote";
-import ws from "./ws.remote";
 
 const input = document.querySelector("textarea") as HTMLTextAreaElement;
 const output = document.querySelector("output") as HTMLOutputElement;
@@ -11,4 +10,3 @@ button.addEventListener("click", async () => {
   const echoed = await echo(text);
   output.textContent = echoed;
 });
-console.log(ws);
