@@ -14,7 +14,8 @@ const getHash = async (input: string) => {
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray
     .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+    .join("")
+    .slice(0, 10);
   return hashHex;
 };
 const createClient = (url: string) =>
@@ -186,11 +187,10 @@ export const monoserve = ({
           .then((bundle) => bundle.generate(rolldownOutputOptions))
           .then((generated) => generated.output[0].code)
           .then(async (code) => {
-            const hash = await getHash(code);
             const path = join(
               tempLocation.startsWith("./") ? cwd() : "",
               tempLocation,
-              `monoserve-${hash.slice(0, 10)}.js`,
+              `monoserve-${await getHash(code)}.js`,
             );
             const folder = dirname(path);
             await mkdir(folder, { recursive: true });
