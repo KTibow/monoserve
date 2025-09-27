@@ -140,7 +140,7 @@ export const monoserve = ({
   rolldownOutputOptions.inlineDynamicImports = true;
 
   const remoteModules = new Map<string, string>();
-  let isBuild = false;
+  let isBuild = true;
   let env: Record<string, string>;
 
   return {
