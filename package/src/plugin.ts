@@ -108,12 +108,14 @@ const sendResponse = async (res: ServerResponse, response: Response) => {
 export type Options = {
   monoserverURL: string; // set to /__monoserve/ to preview locally
   tempLocation?: string;
+  env?: Record<string, string>; // if you aren't using vite
   rolldownInputOptions?: InputOptions;
   rolldownOutputOptions?: OutputOptions;
 };
 export const monoserve = ({
   monoserverURL,
   tempLocation = tmpdir(),
+  env,
   rolldownInputOptions,
   rolldownOutputOptions,
 }: Options): Plugin => {
@@ -128,7 +130,10 @@ export const monoserve = ({
             if (id == "$env/static/private") return id;
           },
           async load(id) {
-            if (id == "$env/static/private") return await genEnv(env);
+            if (id == "$env/static/private") {
+              if (!env) throw new Error("No env found");
+              return await genEnv(env);
+            }
           },
         },
       ],
@@ -141,7 +146,6 @@ export const monoserve = ({
 
   const remoteModules = new Map<string, string>();
   let isBuild = true;
-  let env: Record<string, string>;
 
   return {
     name: "vite-plugin-monoserve",
