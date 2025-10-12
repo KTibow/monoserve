@@ -13,6 +13,10 @@ jobs:
         uses: pnpm/action-setup@v4
         with:
           version: latest
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: latest
       - name: Set up package
         run: pnpm install && pnpm prepack
         working-directory: package
