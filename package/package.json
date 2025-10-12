@@ -1,6 +1,6 @@
 {
   "name": "monoserve",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "type": "module",
   "license": "MIT",
   "homepage": "https://github.com/KTibow/monoserve/tree/main/package#readme",
@@ -15,8 +15,14 @@
     "dist"
   ],
   "exports": {
-    ".": "./dist/index.js",
-    "./plugin": "./dist/plugin.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "default": "./dist/plugin.js"
+    }
   },
   "bin": {
     "monoserve-gen-env": "./dist/gen-env-cli.js"
@@ -25,7 +31,7 @@
     "access": "public"
   },
   "scripts": {
-    "prepack": "tsdown",
+    "prepack": "tsdown && node env-support.ts",
     "dev": "tsdown --watch",
     "typecheck": "tsc --noEmit"
   },
