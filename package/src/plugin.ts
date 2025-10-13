@@ -1,7 +1,8 @@
 import { loadEnv, type Connect, type Plugin } from "vite";
 import { rolldown, type InputOptions, type OutputOptions } from "rolldown";
 import { dirname, join } from "node:path";
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
 import { tmpdir } from "node:os";
 import { cwd } from "node:process";
 import type { ServerResponse } from "node:http";
@@ -145,6 +146,7 @@ export const monoserve = ({
   rolldownOutputOptions.inlineDynamicImports = true;
 
   const remoteModules = new Map<string, string>();
+  const tempFiles = new Set<string>();
   let isBuild = true;
 
   return {
@@ -172,6 +174,14 @@ export const monoserve = ({
       return { code: client };
     },
     configureServer(server) {
+      // Clean up temp files when server closes
+      server.httpServer?.on("close", async () => {
+        await Promise.all(
+          Array.from(tempFiles).map((file) => rm(file, { force: true })),
+        );
+        tempFiles.clear();
+      });
+
       server.middlewares.use(async (req, res, next) => {
         if (!req.url?.startsWith("/__monoserve/")) {
           return next();
@@ -196,15 +206,19 @@ export const monoserve = ({
               tempLocation,
               `monoserve-${await getHash(code)}.js`,
             );
-            const folder = dirname(path);
-            await mkdir(folder, { recursive: true });
-            await writeFile(path, code);
+
+            // Only write if file doesn't exist
+            try {
+              await access(path, constants.F_OK);
+            } catch {
+              const folder = dirname(path);
+              await mkdir(folder, { recursive: true });
+              await writeFile(path, code);
+              tempFiles.add(path);
+            }
+
             const { default: handler } = await import(path);
-
-            const response = await handler(request);
-
-            await rm(path);
-            return response;
+            return await handler(request);
           });
 
         await sendResponse(res, response);
