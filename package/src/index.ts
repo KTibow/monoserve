@@ -8,6 +8,10 @@ type InferParsed<S> = S extends StandardSchemaV1<any, infer P> ? P : never;
 const wrap =
   (f: (request: Request) => MaybePromise<Response>) => (request: Request) =>
     Promise.resolve(f(request)).catch((err) => {
+      if (err instanceof Response) {
+        return err;
+      }
+
       console.error(err);
       return new Response("Internal server error", { status: 500 });
     });
