@@ -246,6 +246,7 @@ export const monoserve = ({
     async closeBundle() {
       if (!isBuild) return;
 
+      // Reset functions output
       try {
         const files = await readdir(functionsDir);
         await Promise.all(files.map((file) => rm(join(functionsDir, file))));
