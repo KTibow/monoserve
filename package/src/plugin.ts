@@ -21,42 +21,132 @@ const getHash = async (input: string) => {
     .slice(0, 10);
   return hashHex;
 };
-const createClient = (url: string) =>
-  `
-import { stringify, parse } from "devalue";
+const createClient = (
+  url: string,
+  { input, output }: { input: ModeInput; output: ModeOutput },
+) => {
+  let code = "";
+  if (input == "manual") {
+    code += `export default async function(init) {
+  const res = await fetch(${JSON.stringify(url)}, {
+    method: "POST",
+    ...init,
+  });
+`;
+  } else {
+    code += `import { stringify, parse } from "devalue";
 export default async function(arg, init) {
   const res = await fetch(${JSON.stringify(url)}, {
     method: "POST",
-    body: stringify(arg),
+    body: ${input == "devalue" ? "stringify(arg)" : "JSON.stringify(arg)"},
     ...init,
   });
-
+`;
+  }
+  code += `
   if (!res.ok) {
     throw new Error(await res.text());
   }
-
-  const contentType = res.headers.get("content-type");
-  if (!contentType?.includes("application/json")) {
-    return res;
+  `;
+  if (output == "manual") {
+    code += `
+  return res;
+}`;
+  } else if (output == "json") {
+    code += `
+  return await res.json();
+}`;
+  } else {
+    code += `
+  const text = await res.text();
+  return parse(text);
+}`;
   }
-  return parse(await res.text());
-}
-`.trimStart();
-const createRawClient = (url: string) =>
-  `
-export default async function(init) {
-  return await fetch(${JSON.stringify(url)}, {
-    method: "POST",
-    ...init,
-  });
-}
-`.trimStart();
+  return code;
+};
 const createWebSocketClient = (url: string) =>
   `
 export default function() {
   return new WebSocket(${JSON.stringify(url)});
 }
 `.trimStart();
+
+const generateMonoserveImpl = (mode: Mode): string => {
+  if (mode.mode == "websocket") {
+    return `
+export function fnWebSocket(inner) {
+  if (typeof Deno == "undefined") {
+    throw new Error("WebSocket not supported in this environment");
+  }
+  return async (req) => {
+    if (req.method != "GET") {
+      return new Response("Method not allowed", { status: 405 });
+    }
+    const { socket, response } = Deno.upgradeWebSocket(req);
+    Promise.resolve(inner(socket, req)).catch((err) => {
+      console.error("WebSocket error:", err);
+      socket.close(1011, "Internal server error");
+    });
+    return response;
+  };
+}
+`.trimStart();
+  }
+
+  const { input, output } = mode;
+  let code = "";
+
+  // Imports
+  code += `import { parse, stringify } from "devalue";\n\n`;
+
+  // Function signature
+  code += `export function fn(${input == "manual" ? "inner" : "schema, inner"}) {\n`;
+
+  code += `  return async (request) => {\n`;
+  code += `    if (request.method != "POST") {\n`;
+  code += `      return new Response("Method not allowed", { status: 405 });\n`;
+  code += `    }\n\n`;
+  code += `    try {\n`;
+
+  // Input parsing
+  if (input == "manual") {
+    code += `      const result = await inner();\n`;
+  } else {
+    code += `      const text = await request.text();\n`;
+    code += `      let arg = ${input == "json" ? "JSON.parse(text)" : "parse(text)"};\n\n`;
+    code += `      const validated = await schema["~standard"].validate(arg);\n`;
+    code += `      if (validated.issues) {\n`;
+    code += `        console.warn("Noncompliant request:", validated.issues.map(i => i.message).join(", "));\n`;
+    code += `        return new Response("Invalid input", { status: 400 });\n`;
+    code += `      }\n`;
+    code += `      arg = validated.value;\n`;
+    code += `\n`;
+    code += `      const result = await inner(arg);\n`;
+  }
+
+  code += `\n`;
+
+  // Output serialization
+  if (output == "manual") {
+    code += `      if (!(result instanceof Response)) throw new Error("Result must be Response");\n`;
+    code += `      return result;\n`;
+  } else {
+    code += `      return new Response(${output == "json" ? "JSON.stringify(result)" : "stringify(result)"}, {\n`;
+    code += `        headers: { "content-type": "application/json" }\n`;
+    code += `      });\n`;
+  }
+
+  // Error handling
+  code += `    } catch (err) {\n`;
+  code += `      if (err instanceof Response) return err;\n`;
+  code += `      console.error(err);\n`;
+  code += `      return new Response("Internal server error", { status: 500 });\n`;
+  code += `    }\n`;
+  code += `  };\n`;
+  code += `}\n`;
+
+  return code;
+};
 const toRequest = async (req: Connect.IncomingMessage) => {
   const host = req.headers?.host
     ? `http://${req.headers.host}`
@@ -115,6 +205,17 @@ export type Options = {
   rolldownInputOptions?: InputOptions;
   rolldownOutputOptions?: OutputOptions;
 };
+type ModeInput = "devalue" | "json" | "manual"; // manual = no input
+type ModeOutput = "devalue" | "json" | "manual"; // manual = no serialization; maybe in future allow full manual (no error handling)
+type Mode =
+  | {
+      mode: "websocket";
+    }
+  | {
+      mode: "function";
+      input: ModeInput;
+      output: ModeOutput;
+    };
 export const monoserve = ({
   monoserverURL,
   tempLocation = tmpdir(),
@@ -123,7 +224,7 @@ export const monoserve = ({
   rolldownOutputOptions,
 }: Options): Plugin => {
   const functionsDir = join(process.cwd(), "functions");
-  const bundle = async (path: string) =>
+  const bundle = async (path: string, mode: Mode) =>
     rolldown({
       input: path,
       plugins: [
@@ -131,11 +232,15 @@ export const monoserve = ({
           name: "virtual",
           resolveId(id) {
             if (id == "$env/static/private") return id;
+            if (id == "monoserve") return id;
           },
           async load(id) {
             if (id == "$env/static/private") {
               if (!env) throw new Error("No env found");
               return await genEnv(env);
+            }
+            if (id == "monoserve") {
+              return generateMonoserveImpl(mode);
             }
           },
         },
@@ -147,12 +252,13 @@ export const monoserve = ({
   rolldownOutputOptions.minify ||= "dce-only";
   rolldownOutputOptions.inlineDynamicImports = true;
 
-  const remoteModules = new Map<string, string>();
+  const loadedFunctions = new Map<string, { path: string; mode: Mode }>();
   const tempFiles = new Set<string>();
   let isBuild = true;
 
   return {
     name: "vite-plugin-monoserve",
+    config: () => ({ optimizeDeps: { exclude: ["monoserve"] } }),
     configResolved(config) {
       isBuild = config.command == "build";
       env = loadEnv(config.mode, config.root, "");
@@ -162,18 +268,37 @@ export const monoserve = ({
       if (!isRemote) return;
 
       const hash = await getHash(code);
-      remoteModules.set(hash, id);
-
-      // Return stub
       const fetchURL = isBuild
         ? `${monoserverURL.replace(/\/$/, "")}/${hash}`
         : `/__monoserve/${hash}`;
-      const client = code.includes("fnRaw")
-        ? createRawClient(fetchURL)
-        : code.includes("fnWebSocket")
-          ? createWebSocketClient(fetchURL)
-          : createClient(fetchURL);
-      return { code: client };
+
+      if (code.includes("fnWebSocket")) {
+        const mode: Mode = { mode: "websocket" };
+        loadedFunctions.set(hash, { path: id, mode });
+        return { code: createWebSocketClient(fetchURL) };
+      }
+
+      // Tip: use "//!" syntax to note input/output modes
+
+      let input: ModeInput = "json";
+      if (/fn\(\s*\(\)/.test(code) || /fn\(\s*[a-zA-Z]+\s*\)/.test(code)) {
+        input = "manual";
+      } else if (code.includes("monoserve input: devalue")) {
+        input = "devalue";
+      }
+
+      let output: ModeOutput = "json";
+      if (code.includes("new Response")) {
+        output = "manual";
+      } else if (code.includes("monoserve output: devalue")) {
+        output = "devalue";
+      }
+
+      loadedFunctions.set(hash, {
+        path: id,
+        mode: { mode: "function", input, output },
+      });
+      return { code: createClient(fetchURL, { input, output }) };
     },
     configureServer(server) {
       // Clean up temp files when server closes
@@ -190,16 +315,17 @@ export const monoserve = ({
         }
 
         const fId = req.url.replace("/__monoserve/", "");
-        const id = remoteModules.get(fId);
-        if (!id) {
+        const module = loadedFunctions.get(fId);
+        if (!module) {
           res.statusCode = 404;
           return res.end("Not found");
         }
+        const { path, mode } = module;
 
         // Build a Request
         const request = await toRequest(req);
 
-        const response: Response = await bundle(id)
+        const response: Response = await bundle(path, mode)
           .then((bundle) => bundle.generate(rolldownOutputOptions))
           .then((generated) => generated.output[0].code)
           .then(async (code) => {
@@ -255,8 +381,8 @@ export const monoserve = ({
       }
 
       await Promise.all(
-        Array.from(remoteModules.entries()).map(([hash, id]) =>
-          bundle(id).then((bundle) =>
+        Array.from(loadedFunctions.entries()).map(([hash, { path, mode }]) =>
+          bundle(path, mode).then((bundle) =>
             bundle.write({
               ...rolldownOutputOptions,
               file: `${functionsDir}/${hash}.js`,
