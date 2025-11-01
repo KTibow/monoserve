@@ -288,7 +288,7 @@ export const monoserve = ({
       }
 
       let output: ModeOutput = "json";
-      if (code.includes("new Response")) {
+      if (/(?<!throw) new Response/.test(code)) {
         output = "manual";
       } else if (code.includes("monoserve output: devalue")) {
         output = "devalue";
