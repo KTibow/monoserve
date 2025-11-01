@@ -281,7 +281,11 @@ export const monoserve = ({
       // Tip: use "//!" syntax to note input/output modes
 
       let input: ModeInput = "json";
-      if (/fn\(\s*\(\)/.test(code) || /fn\(\s*[a-zA-Z]+\s*\)/.test(code)) {
+      if (
+        /fn\(\s*\(\)/.test(code) ||
+        /fn\(\s*async \(\)/.test(code) ||
+        /fn\(\s*[a-zA-Z]+\s*\)/.test(code)
+      ) {
         input = "manual";
       } else if (code.includes("monoserve input: devalue")) {
         input = "devalue";
