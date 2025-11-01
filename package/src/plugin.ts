@@ -9,7 +9,7 @@ import { pathToFileURL } from "node:url";
 import type { ServerResponse } from "node:http";
 import { genEnv } from "./gen-env";
 
-const importFile = (path) => import(pathToFileURL(path).href);
+const importFile = (path: string) => import(pathToFileURL(path).href);
 const getHash = async (input: string) => {
   const encoder = new TextEncoder();
   const data = encoder.encode(input);
@@ -237,7 +237,7 @@ export const monoserve = ({
         const request = await toRequest(req);
 
         const response: Response = await importFile(
-          `${functionsDir}/${fId}.js`
+          `${functionsDir}/${fId}.js`,
         ).then(({ default: handler }) => handler(request));
 
         await sendResponse(res, response);
