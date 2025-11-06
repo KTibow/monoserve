@@ -1,8 +1,7 @@
 import { loadEnv, type Connect, type Plugin } from "vite";
 import { rolldown, type InputOptions, type OutputOptions } from "rolldown";
 import { dirname, join, relative } from "node:path";
-import { access, mkdir, readdir, rm, writeFile } from "node:fs/promises";
-import { constants } from "node:fs";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { cwd } from "node:process";
 import { pathToFileURL } from "node:url";
@@ -20,6 +19,10 @@ const hashByte = async (input: string) => {
 };
 const prependProjectHash = async (name: string, root?: string) => {
   if (!root) return name;
+  root = root
+    .split("/")
+    .filter((x) => x != "src")
+    .at(-1)!;
   const hash = await hashByte(root);
   return `${hash}-${name}`;
 };
@@ -204,13 +207,6 @@ const sendResponse = async (res: ServerResponse, response: Response) => {
   }
 };
 
-export type Options = {
-  monoserverURL: string; // set to /__monoserve/ to preview locally
-  tempLocation?: string;
-  env?: Record<string, string>; // if you aren't using vite
-  rolldownInputOptions?: InputOptions;
-  rolldownOutputOptions?: OutputOptions;
-};
 type ModeInput = "devalue" | "json" | "manual"; // manual = no input
 type ModeOutput = "devalue" | "json" | "manual"; // manual = no serialization; maybe in future allow full manual (no error handling)
 type Mode =
@@ -222,6 +218,13 @@ type Mode =
       input: ModeInput;
       output: ModeOutput;
     };
+export type Options = {
+  monoserverURL: string; // set to /__monoserve/ to preview locally
+  tempLocation?: string;
+  env?: Record<string, string>; // if you aren't using vite
+  rolldownInputOptions?: InputOptions;
+  rolldownOutputOptions?: OutputOptions;
+};
 export const monoserve = ({
   monoserverURL,
   tempLocation = tmpdir(),
@@ -264,7 +267,7 @@ export const monoserve = ({
   >();
   const tempFiles = new Set<string>();
   let isBuild = true;
-  let root = "";
+  let root = cwd();
 
   return {
     name: "vite-plugin-monoserve",
