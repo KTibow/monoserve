@@ -17,18 +17,10 @@ const hashByte = async (input: string) => {
   const dv = new DataView(hashBuffer);
   return dv.getUint8(0).toString(16).padStart(2, "0");
 };
-const prependProjectHash = async (name: string, root?: string) => {
-  if (!root) return name;
-  root = root
-    .split("/")
-    .filter((x) => x != "src")
-    .at(-1)!;
-  const hash = await hashByte(root);
-  return `${hash}-${name}`;
-};
-const appendCodeHash = async (name: string, code: string) => {
-  const hash = await hashByte(code);
-  return `${name}-${hash}`;
+const addIDHash = async (name: string, id: string, root: string) => {
+  const removalTarget = root.replace(/\/src$/, "").replace(/\/[^\s\/]+?$/, "/");
+  const hash = await hashByte(id.replace(removalTarget, ""));
+  return `${name}:${hash}`;
 };
 const createClient = (
   url: string,
@@ -284,11 +276,7 @@ export const monoserve = ({
       // Tip: use "//!" syntax to note input/output modes or stability
 
       let name = getName(id);
-      if (isBuild && code.includes("monoserve id: stable")) {
-        name = await prependProjectHash(name, root);
-      } else {
-        name = await appendCodeHash(name, code);
-      }
+      name = await addIDHash(name, id, root);
       let fetchURL: string, key: string;
       if (isBuild) {
         fetchURL = `${monoserverURL.replace(/\/$/, "")}/${name}`;
