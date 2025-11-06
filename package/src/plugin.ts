@@ -1,6 +1,6 @@
 import { loadEnv, type Connect, type Plugin } from "vite";
 import { rolldown, type InputOptions, type OutputOptions } from "rolldown";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { access, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { tmpdir } from "node:os";
@@ -10,16 +10,18 @@ import type { ServerResponse } from "node:http";
 import { genEnv } from "./gen-env";
 
 const importFile = (path: string) => import(pathToFileURL(path).href);
-const getHash = async (input: string) => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(input);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-    .slice(0, 10);
-  return hashHex;
+const getName = async (id: string, input?: string) => {
+  let name = id.split("/").at(-1)!.split(".")[0];
+
+  if (input) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(input);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const dv = new DataView(hashBuffer);
+    name += dv.getUint8(0).toString(16).padStart(2, "0");
+  }
+
+  return name;
 };
 const createClient = (
   url: string,
@@ -252,9 +254,13 @@ export const monoserve = ({
   rolldownOutputOptions.minify ||= "dce-only";
   rolldownOutputOptions.inlineDynamicImports = true;
 
-  const loadedFunctions = new Map<string, { path: string; mode: Mode }>();
+  const loadedFunctions = new Map<
+    string,
+    { path: string; name: string; mode: Mode }
+  >();
   const tempFiles = new Set<string>();
   let isBuild = true;
+  let root = "";
 
   return {
     name: "vite-plugin-monoserve",
@@ -262,23 +268,29 @@ export const monoserve = ({
     configResolved(config) {
       isBuild = config.command == "build";
       env = loadEnv(config.mode, config.root, "");
+      root = config.root;
     },
     async transform(code, id) {
       const isRemote = id.endsWith(".remote.ts") || id.endsWith(".remote.js");
       if (!isRemote) return;
 
-      const hash = await getHash(code);
-      const fetchURL = isBuild
-        ? `${monoserverURL.replace(/\/$/, "")}/${hash}`
-        : `/__monoserve/${hash}`;
+      // Tip: use "//!" syntax to note input/output modes or stability
+
+      const isStable = isBuild && code.includes("monoserve id: stable");
+      const name = await getName(id, isStable ? undefined : code);
+      let fetchURL: string, key: string;
+      if (isBuild) {
+        fetchURL = `${monoserverURL.replace(/\/$/, "")}/${name}`;
+        key = name;
+      } else {
+        key = fetchURL = `/__monoserve/${relative(root, id)}`;
+      }
 
       if (code.includes("fnWebSocket")) {
         const mode: Mode = { mode: "websocket" };
-        loadedFunctions.set(hash, { path: id, mode });
+        loadedFunctions.set(key, { path: id, name, mode });
         return { code: createWebSocketClient(fetchURL) };
       }
-
-      // Tip: use "//!" syntax to note input/output modes
 
       let input: ModeInput = "json";
       if (
@@ -298,8 +310,9 @@ export const monoserve = ({
         output = "devalue";
       }
 
-      loadedFunctions.set(hash, {
+      loadedFunctions.set(key, {
         path: id,
+        name,
         mode: { mode: "function", input, output },
       });
       return { code: createClient(fetchURL, { input, output }) };
@@ -318,42 +331,31 @@ export const monoserve = ({
           return next();
         }
 
-        const fId = req.url.replace("/__monoserve/", "");
-        const module = loadedFunctions.get(fId);
+        const module = loadedFunctions.get(req.url);
         if (!module) {
           res.statusCode = 404;
           return res.end("Not found");
         }
-        const { path, mode } = module;
+        const { path, name, mode } = module;
 
         // Build a Request
         const request = await toRequest(req);
 
-        const response: Response = await bundle(path, mode)
-          .then((bundle) => bundle.generate(rolldownOutputOptions))
-          .then((generated) => generated.output[0].code)
-          .then(async (code) => {
-            const path = join(
-              tempLocation.startsWith("./") ? cwd() : "",
-              tempLocation,
-              `monoserve-${await getHash(code)}.js`,
-            );
+        // Only write if file doesn't exist
+        try {
+          await access(path, constants.F_OK);
+        } catch {
+          const folder = dirname(path);
+          await mkdir(folder, { recursive: true });
+          const code = await bundle(path, mode)
+            .then((bundle) => bundle.generate(rolldownOutputOptions))
+            .then((generated) => generated.output[0].code);
+          await writeFile(path, code);
+          tempFiles.add(path);
+        }
+        const { default: handler } = await importFile(path);
 
-            // Only write if file doesn't exist
-            try {
-              await access(path, constants.F_OK);
-            } catch {
-              const folder = dirname(path);
-              await mkdir(folder, { recursive: true });
-              await writeFile(path, code);
-              tempFiles.add(path);
-            }
-
-            const { default: handler } = await importFile(path);
-            return await handler(request);
-          });
-
-        await sendResponse(res, response);
+        await sendResponse(res, await handler(request));
       });
     },
     configurePreviewServer(server) {
