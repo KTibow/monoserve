@@ -10,16 +10,16 @@ import { genEnv } from "./gen-env";
 
 const importFile = (path: string) => import(pathToFileURL(path).href);
 const getName = (id: string) => id.split("/").at(-1)!.split(".")[0];
-const hashByte = async (input: string) => {
+const hash4 = async (input: string) => {
   const encoder = new TextEncoder();
   const data = encoder.encode(input);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const dv = new DataView(hashBuffer);
-  return dv.getUint8(0).toString(16).padStart(2, "0");
+  return dv.getUint16(0).toString(16).padStart(2, "0");
 };
 const addIDHash = async (name: string, id: string, root: string) => {
   const removalTarget = root.replace(/\/src$/, "").replace(/\/[^\s\/]+?$/, "/");
-  const hash = await hashByte(id.replace(removalTarget, ""));
+  const hash = await hash4(id.replace(removalTarget, ""));
   return `${name}:${hash}`;
 };
 const createClient = (
@@ -277,12 +277,14 @@ export const monoserve = ({
 
       let name = getName(id);
       name = await addIDHash(name, id, root);
+
       let fetchURL: string, key: string;
       if (isBuild) {
         fetchURL = `${monoserverURL.replace(/\/$/, "")}/${name}`;
         key = name;
       } else {
         key = fetchURL = `/__monoserve/${relative(root, id)}`;
+        name += `:${await hash4(code)}`;
       }
 
       if (code.includes("fnWebSocket")) {
