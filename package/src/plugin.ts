@@ -10,18 +10,22 @@ import type { ServerResponse } from "node:http";
 import { genEnv } from "./gen-env";
 
 const importFile = (path: string) => import(pathToFileURL(path).href);
-const getName = async (id: string, input?: string) => {
-  let name = id.split("/").at(-1)!.split(".")[0];
-
-  if (input) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(input);
-    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-    const dv = new DataView(hashBuffer);
-    name += dv.getUint8(0).toString(16).padStart(2, "0");
-  }
-
-  return name;
+const getName = (id: string) => id.split("/").at(-1)!.split(".")[0];
+const hashByte = async (input: string) => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const dv = new DataView(hashBuffer);
+  return dv.getUint8(0).toString(16).padStart(2, "0");
+};
+const prependProjectHash = async (name: string, root?: string) => {
+  if (!root) return name;
+  const hash = await hashByte(root);
+  return `${hash}-${name}`;
+};
+const appendCodeHash = async (name: string, code: string) => {
+  const hash = await hashByte(code);
+  return `${name}-${hash}`;
 };
 const createClient = (
   url: string,
@@ -256,7 +260,7 @@ export const monoserve = ({
 
   const loadedFunctions = new Map<
     string,
-    { path: string; name: string; mode: Mode }
+    { id: string; name: string; mode: Mode }
   >();
   const tempFiles = new Set<string>();
   let isBuild = true;
@@ -276,8 +280,12 @@ export const monoserve = ({
 
       // Tip: use "//!" syntax to note input/output modes or stability
 
-      const isStable = isBuild && code.includes("monoserve id: stable");
-      const name = await getName(id, isStable ? undefined : code);
+      let name = getName(id);
+      if (isBuild && code.includes("monoserve id: stable")) {
+        name = await prependProjectHash(name, root);
+      } else {
+        name = await appendCodeHash(name, code);
+      }
       let fetchURL: string, key: string;
       if (isBuild) {
         fetchURL = `${monoserverURL.replace(/\/$/, "")}/${name}`;
@@ -288,7 +296,7 @@ export const monoserve = ({
 
       if (code.includes("fnWebSocket")) {
         const mode: Mode = { mode: "websocket" };
-        loadedFunctions.set(key, { path: id, name, mode });
+        loadedFunctions.set(key, { id, name, mode });
         return { code: createWebSocketClient(fetchURL) };
       }
 
@@ -311,7 +319,7 @@ export const monoserve = ({
       }
 
       loadedFunctions.set(key, {
-        path: id,
+        id,
         name,
         mode: { mode: "function", input, output },
       });
@@ -336,20 +344,19 @@ export const monoserve = ({
           res.statusCode = 404;
           return res.end("Not found");
         }
-        const { path, name, mode } = module;
+        const { id, name, mode } = module;
 
         // Build a Request
         const request = await toRequest(req);
 
-        // Only write if file doesn't exist
-        try {
-          await access(path, constants.F_OK);
-        } catch {
-          const folder = dirname(path);
-          await mkdir(folder, { recursive: true });
-          const code = await bundle(path, mode)
+        // Only write if needed (based on how path is a unique hash)
+        const path = join(tempLocation, `monoserve-${name}.js`);
+        if (!tempFiles.has(path)) {
+          const code = await bundle(id, mode)
             .then((bundle) => bundle.generate(rolldownOutputOptions))
             .then((generated) => generated.output[0].code);
+          const folder = dirname(path);
+          await mkdir(folder, { recursive: true });
           await writeFile(path, code);
           tempFiles.add(path);
         }
@@ -387,13 +394,14 @@ export const monoserve = ({
       }
 
       await Promise.all(
-        Array.from(loadedFunctions.entries()).map(([hash, { path, mode }]) =>
-          bundle(path, mode).then((bundle) =>
-            bundle.write({
-              ...rolldownOutputOptions,
-              file: `${functionsDir}/${hash}.js`,
-            }),
-          ),
+        Array.from(loadedFunctions.entries()).map(
+          ([hash, { id: path, mode }]) =>
+            bundle(path, mode).then((bundle) =>
+              bundle.write({
+                ...rolldownOutputOptions,
+                file: `${functionsDir}/${hash}.js`,
+              }),
+            ),
         ),
       );
     },
