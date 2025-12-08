@@ -1,7 +1,7 @@
 import { loadEnv, type Connect, type Plugin } from "vite";
 import { rolldown, type InputOptions, type OutputOptions } from "rolldown";
 import { dirname, join, relative } from "node:path";
-import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, rm, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { cwd } from "node:process";
 import { pathToFileURL } from "node:url";
@@ -269,12 +269,11 @@ export const monoserve = ({
       env = loadEnv(config.mode, config.root, "");
       root = config.root;
     },
-    async transform(code, id) {
+    async load(id) {
       const isRemote = id.endsWith(".remote.ts") || id.endsWith(".remote.js");
-      if (!isRemote) return;
+      if (!isRemote) return null; // Return null to let other plugins handle it
 
-      // Tip: use "//!" syntax to note input/output modes or stability
-
+      const code = await readFile(id, "utf-8");
       let name = getName(id);
       name = await addIDHash(name, id, root);
 
@@ -290,9 +289,10 @@ export const monoserve = ({
       if (code.includes("fnWebSocket")) {
         const mode: Mode = { mode: "websocket" };
         loadedFunctions.set(key, { id, name, mode });
-        return { code: createWebSocketClient(fetchURL) };
+        return createWebSocketClient(fetchURL);
       }
 
+      // Tip: use "//!" syntax to note input/output modes
       let input: ModeInput = "json";
       if (
         /fn\(\s*\(\)/.test(code) ||
@@ -316,7 +316,7 @@ export const monoserve = ({
         name,
         mode: { mode: "function", input, output },
       });
-      return { code: createClient(fetchURL, { input, output }) };
+      return createClient(fetchURL, { input, output });
     },
     configureServer(server) {
       // Clean up temp files when server closes
