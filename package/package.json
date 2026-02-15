@@ -1,6 +1,6 @@
 {
   "name": "monoserve",
-  "version": "3.2.3",
+  "version": "3.2.4",
   "type": "module",
   "license": "MIT",
   "homepage": "https://github.com/KTibow/monoserve/tree/main/package#readme",
@@ -30,7 +30,7 @@
     "access": "public"
   },
   "scripts": {
-    "prepack": "tsdown && node env-support.ts",
+    "prepack": "tsdown",
     "dev": "tsdown --watch",
     "typecheck": "tsc --noEmit"
   },

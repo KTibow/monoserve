@@ -1,8 +1,7 @@
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
-const envPath = join(fileURLToPath(import.meta.url), "..", "env.d.ts");
+const envPath = join(process.cwd(), "node_modules", "@types", "monoserve-env", "index.d.ts");
 
 export const genEnv = async (
   env: NodeJS.ProcessEnv | Record<string, string>,
@@ -16,6 +15,7 @@ export const genEnv = async (
   }
   envDTS += "}\n";
 
+  await mkdir(dirname(envPath), { recursive: true });
   await writeFile(envPath, envDTS);
 
   return js;
